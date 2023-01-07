@@ -1,87 +1,68 @@
-#include<iostream>
-#include"mc.h"
-#include"bs.h"
+#define _USE_MATH_DEFINES
 
-using namespace std;
+#include <iostream>
+#include <cmath>
 
-int main(){
-    double underlying = 100.0;
-    double strike = 100.0;
-    double timeToExpiration = 0.50;
-    double riskFreeRate = 0.05;
-    double volatility = 0.20;
+// Standard normal probability density function
+double norm_pdf(const double& x) {
+    return (1.0/(pow(2*M_PI,0.5)))*exp(-0.5*x*x);
+}
 
-    cout << '\t' << '\t' << " [Black Scholes formula & Monte Carlo Simulation] Program" << endl;
+// An approximation to the cumulative distribution function
+// for the standard normal distribution
+// Note: This is a recursive function
+double norm_cdf(const double& x) {
+    double k = 1.0/(1.0 + 0.2316419*x);
+    double k_sum = k*(0.319381530 + k*(-0.356563782 + k*(1.781477937 + k*(-1.821255978 + 1.330274429*k))));
 
-    cout << endl;
+    if (x >= 0.0) {
+        return (1.0 - (1.0/(pow(2*M_PI,0.5)))*exp(-0.5*x*x) * k_sum);
+    } else {
+        return 1.0 - norm_cdf(-x);
+    }
+}
 
-    cout << "Basic parameters: " << endl;
+// This calculates d_j, for j in {1,2}. This term appears in the closed
+// form solution for the European call or put price
+double d_j(const int& j, const double& S, const double& K, const double& r, const double& v, const double& T) {
+    return (log(S/K) + (r + (pow(-1,j-1))*0.5*v*v)*T)/(v*(pow(T,0.5)));
+}
 
-    cout << "Strike price: " << strike << endl;
+// Calculate the European vanilla call price based on
+// underlying S, strike K, risk-free rate r, volatility of
+// underlying sigma and time to maturity T
+double call_price(const double& S, const double& K, const double& r, const double& v, const double& T) {
+    return S * norm_cdf(d_j(1, S, K, r, v, T))-K*exp(-r*T) * norm_cdf(d_j(2, S, K, r, v, T));
+}
 
-    cout << "Time to experiation: " << timeToExpiration << endl;
+// Calculate the European vanilla put price based on
+// underlying S, strike K, risk-free rate r, volatility of
+// underlying sigma and time to maturity T
+double put_price(const double& S, const double& K, const double& r, const double& v, const double& T) {
+    return -S*norm_cdf(-d_j(1, S, K, r, v, T))+K*exp(-r*T) * norm_cdf(-d_j(2, S, K, r, v, T));
+}
 
-    cout << "Risk free rate: " << riskFreeRate << endl;
+int main(int argc, char **argv) {
+    // First we create the parameter list
+    double S = 100.0;  // Option price
+    double K = 100.0;  // Strike price
+    double r = 0.05;   // Risk-free rate (5%)
+    double v = 0.2;    // Volatility of the underlying (20%)
+    double T = 1.0;    // One year until expiry
 
-    cout << "Volatility: " << volatility << endl;
+    // Then we calculate the call/put values
+    double call = call_price(S, K, r, v, T);
+    double put = put_price(S, K, r, v, T);
 
-    cout << "~*~*~*~*~*~*~*~*~*~*~*~*~*~*~*~*~*~*~*~*~*~*~*" << endl;
+    // Finally we output the parameters and prices
+    std::cout << "Underlying:      " << S << std::endl;
+    std::cout << "Strike:          " << K << std::endl;
+    std::cout << "Risk-Free Rate:  " << r << std::endl;
+    std::cout << "Volatility:      " << v << std::endl;
+    std::cout << "Maturity:        " << T << std::endl;
 
+    std::cout << "Call Price:      " << call << std::endl;
+    std::cout << "Put Price:       " << put << std::endl;
 
-
-    Monte_Carlo simu(underlying, strike, riskFreeRate, timeToExpiration, volatility, 50000);
-
-    simu.price();
-
-    BS_Model call_1(underlying, strike, timeToExpiration, riskFreeRate, volatility, "call");
-
-    BS_Model put_1(underlying, strike, timeToExpiration, riskFreeRate, volatility, "put");
-
-
-
-    cout << '\t' << '\t' << " Result of Monte-Carlo Simulation:" << endl;
-
-    cout << "Call Price: " << simu.result[0] << endl;
-
-    cout << "Put Price: " << simu.result[1] << endl;
-
-    cout << endl;
-
-    cout << '\t' << '\t' << " Result of Black-Scholes Formula:" << endl;
-
-    cout << "Option type: Euro " << "Call" << endl;
-
-    cout << '\t' << "Option price : " << call_1.pricing() << endl;
-
-    cout << '\t' << "Delta: " << call_1.para_delta() << endl;
-
-    cout << '\t' << "Gamma: " << call_1.para_gamma() << endl;
-
-    cout << '\t' << "Theta: " << call_1.para_theta() / 365 << endl;
-
-    cout << '\t' << "Rho " << call_1.para_rho() << endl;
-
-    cout << '\t' << "Vega " << call_1.para_vega() << endl;
-
-    cout << "***********************************************" << endl;
-
-    //Put
-
-    cout << endl;
-
-    cout << "Option type: Euro " << "Put" << endl;
-
-    cout << '\t' << "Option price: " << put_1.pricing() << endl;
-
-    cout << '\t' << "Delta: " << put_1.para_delta() << endl;
-
-    cout << '\t' << "Gamma: " << put_1.para_gamma() << endl;
-
-    cout << '\t' << "Theta: " << put_1.para_theta() / 365 << endl;
-
-    cout << '\t' << "Rho " << put_1.para_rho() << endl;
-
-    cout << '\t' << "Vega " << put_1.para_vega() << endl;
-
-    cout << endl;
+    return 0;
 }
